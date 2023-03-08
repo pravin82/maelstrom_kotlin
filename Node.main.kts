@@ -2,7 +2,7 @@
 @file:Repository("https://jcenter.bintray.com")
 @file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
 @file:DependsOn("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
-@file:Import("dtos.main.kts")
+@file:Import("dtos.main.kts","Gset.main.kts")
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.util.*
@@ -18,7 +18,7 @@ class Node(
     private val lock = ReentrantLock()
     private val logLock = ReentrantLock()
     private val mapper = jacksonObjectMapper()
-    private val value = mutableSetOf<Int?>()
+    private val crdt = Gset(emptySet<Int>().toMutableSet())
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
 
@@ -43,15 +43,15 @@ class Node(
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId, echo = body.echo )
             }
             "add" -> {
-                value.add(body.element)
+                crdt.addElement(body.element?:-1)
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId, echo = body.echo )
 
             }
             "read" -> {
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId , value = value)
+                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId , value = crdt.elements)
             }
             "replicate" ->{
-                value.addAll(body.value?: emptySet<Int>())
+                crdt.merge(Gset(body.value?.toMutableSet()?: emptySet<Int>().toMutableSet()))
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
             "topology" -> {
@@ -105,7 +105,7 @@ class Node(
     fun replicateMsg(){
         System.err.println("Replicate Called")
         nodeIds.map{
-            val bodyToBeSent = EchoBody("replicate",msgId = 0,value = value )
+            val bodyToBeSent = EchoBody("replicate",msgId = 0,value = crdt.elements )
             val msgToBeSent =  EchoMsg(1,it, bodyToBeSent, nodeId)
             sendMsg(it,msgToBeSent)
         }
