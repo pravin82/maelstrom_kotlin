@@ -1,5 +1,5 @@
 #!/usr/bin/env kotlin
-// ./maelstrom test -w broadcast  --bin /Users/pravin/script2/script2.main.kts   --time-limit 5  --log-stderr
+// ./maelstrom test -w g-set  --bin /Users/pravin/script2/script2.main.kts   --time-limit 5  --log-stderr
 
 @file:Repository("https://jcenter.bintray.com")
 @file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
