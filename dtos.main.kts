@@ -23,8 +23,8 @@ data class EchoBody(
     @JsonProperty("in_reply_to")   val inReplyTo :Int? = null,
     val echo:String? = null,
     val topology:Map<String,List<String>>? = null,
-    val message:Int? = null,
-    val messages:List<Int?>? = null
+    val element:Int? = null,
+    val value:Set<Int?>? = null
 )
 
 data class ReplyBody(
