@@ -25,8 +25,9 @@ data class EchoBody(
     val topology:Map<String,List<String>>? = null,
     val counterMap:MutableMap<String,Int>? = null,
     val delta:Int? = null,
-    val value:Int? = null
+    val txn:List<List<Any>>? = null
 )
+
 
 data class ReplyBody(
     val type:String,

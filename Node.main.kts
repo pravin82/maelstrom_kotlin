@@ -22,6 +22,7 @@ class Node(
     private val crdt = GCounter(mutableMapOf<String,Int>(), nodeId)
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
+    private val valueStore = mutableMapOf<String, MutableList<Int>>()
 
 
     fun logMsg(msg:String) {
@@ -30,7 +31,6 @@ class Node(
         System.out.flush()
         logLock.unlock()
     }
-
 
     fun sendReplyMsg(echoMsg: EchoMsg){
         val body = echoMsg.body
@@ -41,6 +41,11 @@ class Node(
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
 
+            "txn" ->{
+                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId,txn = body.txn )
+            }
+            
+
             "add" -> {
                 lock.tryLock(5,TimeUnit.SECONDS)
                 crdt.addElement(body.delta?:0)
@@ -48,18 +53,7 @@ class Node(
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId, echo = body.echo )
 
             }
-            "read" -> {
-                lock.tryLock(5,TimeUnit.SECONDS)
-                val readValue = crdt.read()
-                lock.unlock()
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId , value = readValue)
-            }
-            "replicate" ->{
-               // lock.tryLock(5,TimeUnit.SECONDS)
-                crdt.merge(GCounter(body.counterMap?:emptyMap<String,Int>().toMutableMap(),"-1"))
-               // lock.unlock()
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
-            }
+
             "topology" -> {
                 val nodeIds = body.topology?.get(nodeId)?: emptyList<String>()
                 neighbors.addAll(nodeIds)
@@ -95,7 +89,6 @@ class Node(
         System.out.println( replyStr)
         System.out.flush()
 
-        
     }
     fun replicateMsgScheduler(){
         Timer().scheduleAtFixedRate( object : TimerTask() {
@@ -106,6 +99,7 @@ class Node(
 
     }
 
+
     fun replicateMsg(){
         lock.tryLock(5,TimeUnit.SECONDS)
         System.err.println("Replicate Called CRDT7: ${crdt.counterMap}")
@@ -115,5 +109,30 @@ class Node(
             sendMsg(it,msgToBeSent)
         }
         lock.unlock()
+    }
+
+
+    fun executeTxns(txns:List<List<Any>>):List<List<Any?>>{
+      val completedTxns =   txns.map{txn->
+            val txnType = txn.first()
+            val txnKey = txn[1] as String
+            val txnValue = txn[2]
+           val valueStored = valueStore.get(txnKey) as List<Int>?
+            when(txnType){
+             "r" -> {
+                 listOf(txnType, txnKey, valueStored)
+             }
+                "append" -> {
+                    val modifiedValue = ((valueStored?:emptyList<Int>()).plus(txnValue)).toMutableList() as MutableList<Int>
+                    valueStore.put(txnKey,modifiedValue )
+                    listOf(txnType, txnKey, txnValue)
+
+                }
+                else ->  listOf(txnType, txnKey, txnValue)
+
+            }
+            
+        }
+        return completedTxns
     }
 }

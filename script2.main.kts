@@ -1,6 +1,5 @@
 #!/usr/bin/env kotlin
-// ./maelstrom test -w g-set  --bin /Users/pravin/script2/script2.main.kts   --time-limit 5  --log-stderr
-
+// ./maelstrom test -w txn-list-append --bin /Users/pravin/script2/script2.main.kts  --time-limit 10 --log-stderr --node-count 1
 
 @file:Repository("https://jcenter.bintray.com")
 @file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
@@ -8,7 +7,6 @@
 @file:Import("Node.main.kts","dtos.main.kts")
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-
 
 val mapper = jacksonObjectMapper()
 val EMPTY_STRING = ""
