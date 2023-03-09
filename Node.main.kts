@@ -2,7 +2,8 @@
 @file:Repository("https://jcenter.bintray.com")
 @file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
 @file:DependsOn("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
-@file:Import("dtos.main.kts","Gset.main.kts")
+@file:Import("dtos.main.kts","Gset.main.kts","GCounter.main.kts")
+
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.util.*
@@ -18,7 +19,7 @@ class Node(
     private val lock = ReentrantLock()
     private val logLock = ReentrantLock()
     private val mapper = jacksonObjectMapper()
-    private val crdt = Gset(emptySet<Int>().toMutableSet())
+    private val crdt = GCounter(mutableMapOf<String,Int>(), nodeId)
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
 
@@ -39,19 +40,24 @@ class Node(
             "init" -> {
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
-            "echo" -> {
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId, echo = body.echo )
-            }
+
             "add" -> {
-                crdt.addElement(body.element?:-1)
+                lock.tryLock(5,TimeUnit.SECONDS)
+                crdt.addElement(body.delta?:0)
+                lock.unlock()
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId, echo = body.echo )
 
             }
             "read" -> {
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId , value = crdt.elements)
+                lock.tryLock(5,TimeUnit.SECONDS)
+                val readValue = crdt.read()
+                lock.unlock()
+                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId , value = readValue)
             }
             "replicate" ->{
-                crdt.merge(Gset(body.value?.toMutableSet()?: emptySet<Int>().toMutableSet()))
+               // lock.tryLock(5,TimeUnit.SECONDS)
+                crdt.merge(GCounter(body.counterMap?:emptyMap<String,Int>().toMutableMap(),"-1"))
+               // lock.unlock()
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
             "topology" -> {
@@ -71,7 +77,6 @@ class Node(
         val msg = EchoMsg(echoMsg.id,echoMsg.src,replyBody,echoMsg.dest)
         val replyStr =   mapper.writeValueAsString(msg)
         if(body.type in listOf( "broadcast_ok", "replicate")) return
-        System.err.println("UnAckNO $unackNeighborsMap")
         lock.tryLock(5,TimeUnit.SECONDS)
         System.err.println("Sent $replyStr")
         System.out.println( replyStr)
@@ -83,14 +88,13 @@ class Node(
 //MsgId will be -1 if it is being sent from node
     fun sendMsg(destId:String, msg:EchoMsg){
        val body = msg.body
-       val bodyToBeSent = EchoBody(body.type,msgId = (0..10000).random(), inReplyTo = body.msgId,value = body.value)
+       val bodyToBeSent = EchoBody(body.type,msgId = (0..10000).random(), inReplyTo = body.msgId,counterMap = body.counterMap)
        val msgToBeSent =  EchoMsg(msg.id,destId, bodyToBeSent, nodeId)
         val replyStr =   mapper.writeValueAsString(msgToBeSent)
-        lock.tryLock(5,TimeUnit.SECONDS)
        System.err.println("Sent to Neighbor $replyStr")
         System.out.println( replyStr)
         System.out.flush()
-        lock.unlock()
+
         
     }
     fun replicateMsgScheduler(){
@@ -103,11 +107,13 @@ class Node(
     }
 
     fun replicateMsg(){
-        System.err.println("Replicate Called")
+        lock.tryLock(5,TimeUnit.SECONDS)
+        System.err.println("Replicate Called CRDT7: ${crdt.counterMap}")
         nodeIds.map{
-            val bodyToBeSent = EchoBody("replicate",msgId = 0,value = crdt.elements )
+            val bodyToBeSent = EchoBody("replicate",msgId = 0,counterMap = crdt.counterMap )
             val msgToBeSent =  EchoMsg(1,it, bodyToBeSent, nodeId)
             sendMsg(it,msgToBeSent)
         }
+        lock.unlock()
     }
 }
