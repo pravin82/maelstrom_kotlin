@@ -22,7 +22,7 @@ class Node(
     private val crdt = GCounter(mutableMapOf<String,Int>(), nodeId)
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
-    private val valueStore = mutableMapOf<String, MutableList<Int>>()
+    private val valueStore = mutableMapOf<Int, MutableList<Int>>()
 
 
     fun logMsg(msg:String) {
@@ -42,7 +42,8 @@ class Node(
             }
 
             "txn" ->{
-                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId,txn = body.txn )
+                val txns = executeTxns(body.txn?:emptyList())
+                EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId,txn = txns)
             }
             
 
@@ -112,10 +113,10 @@ class Node(
     }
 
 
-    fun executeTxns(txns:List<List<Any>>):List<List<Any?>>{
+    fun executeTxns(txns:List<List<Any?>>):List<List<Any?>>{
       val completedTxns =   txns.map{txn->
             val txnType = txn.first()
-            val txnKey = txn[1] as String
+            val txnKey = txn[1] as Int
             val txnValue = txn[2]
            val valueStored = valueStore.get(txnKey) as List<Int>?
             when(txnType){

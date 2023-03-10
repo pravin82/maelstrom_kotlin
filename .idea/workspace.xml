@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="942443cc-ca92-4e60-bd63-43697aa27d53" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Node.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/Node.main.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dtos.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/dtos.main.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/script2.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/script2.main.kts" afterDir="false" />
@@ -44,5 +45,19 @@
       <updated>1677985386171</updated>
     </task>
     <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="kotlin-function">
+          <url>file://$PROJECT_DIR$/Node.main.kts</url>
+          <line>34</line>
+          <properties>
+            <option name="EMULATED" value="true" />
+          </properties>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

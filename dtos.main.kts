@@ -25,7 +25,7 @@ data class EchoBody(
     val topology:Map<String,List<String>>? = null,
     val counterMap:MutableMap<String,Int>? = null,
     val delta:Int? = null,
-    val txn:List<List<Any>>? = null
+    val txn:List<List<Any?>>? = null
 )
 
 
