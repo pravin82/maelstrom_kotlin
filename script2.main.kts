@@ -6,13 +6,11 @@
 @file:DependsOn("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
 @file:Import("Node.main.kts","dtos.main.kts")
 
-
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 
 val mapper = jacksonObjectMapper()
 val EMPTY_STRING = ""
 var nextMsgId = 12
-
 
 
 
@@ -32,9 +30,6 @@ while(true){
    val node =  nodeMap.get(echoMsg.dest)
     System.err.println("[ThreadName1:${thread1.name}]Received $input")
     node?.sendReplyMsg(echoMsg)
-
-
-
 
 }
 

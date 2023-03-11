@@ -4,8 +4,6 @@
 @file:DependsOn("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
 @file:Import("dtos.main.kts","Gset.main.kts","GCounter.main.kts")
 
-
-
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -26,11 +24,11 @@ class Node(
     private val crdt = GCounter(mutableMapOf<String,Int>(), nodeId)
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
-    private val valueStore = mutableMapOf<Int, MutableList<Int>>()
     private var readValue = emptyList<Int>()
     private var doesReadValueRec = false
     private var doesWriteValueRec = false
     private val databaseKey = "ROOT"
+    private var databaseValue = emptyMap<Int, List<Int>>()
 
 
     fun logMsg(msg:String) {
@@ -72,8 +70,9 @@ class Node(
 
             "read_ok" -> {
                 lock.tryLock(5,TimeUnit.SECONDS)
-             val value = body.value  as List<Int>
-                readValue = value
+                 val databaseMap = body.value as   Map<Int,List<Int>>
+                // val databaseMap = mapper.readValue(input, Map<Int,List<Int>>::class.java)
+                 databaseValue = databaseMap
                 doesReadValueRec = true
                 condition.signal()
                 lock.unlock()
@@ -124,24 +123,22 @@ class Node(
     }
 
 //MsgId will be -1 if it is being sent from node
-    fun sendMsg(destId:String, body:EchoBody):List<Int>{
+    fun sendMsg(destId:String, body:EchoBody):Map<Int,List<Int>>{
        var list = emptyList<Int>()
        lock.tryLock(5,TimeUnit.SECONDS)
        val msgToBeSent =  EchoMsg(1,destId, body, nodeId)
        val replyStr =   mapper.writeValueAsString(msgToBeSent)
       val thread1 = Thread.currentThread()
-       System.err.println("[ThreadN:${thread1.name}]Sent to Neighbor $replyStr")
+       System.err.println("[ThreadN:${thread1.name}]Sent to tin-kv $replyStr")
         System.err.println("[ThreadN:${thread1.name}] doesReadValueRec: ${doesReadValueRec}")
-       System.out.println( replyStr)
+        System.out.println( replyStr)
        System.out.flush()
       doesReadValueRec = false
        while(!doesReadValueRec){
            condition.await()
        }
-       list = readValue
-       readValue = emptyList()
        lock.unlock()
-       return list
+       return databaseValue
 
     }
 
@@ -163,33 +160,40 @@ class Node(
     }
 
 
-
-    fun executeOps(txns:List<List<Any?>>):List<List<Any?>>{
-      val completedTxns =   txns.map{txn->
-            val txnType = txn.first()
-            val txnKey = txn[1] as Int
-            val txnValue = txn[2]
-             val readReq =   EchoBody("read", key = txnKey,msgId = (0..10000).random() )
-           val valueStored = valueStore.get(txnKey) as List<Int>?
-            when(txnType){
+    fun executeOps(ops:List<List<Any?>>):List<List<Any?>>{
+        val readReq =   EchoBody("read", key = databaseKey,msgId = (0..10000).random() )
+        val databaseMap =   sendMsg("lin-kv",readReq )
+        val databaseMapCopy = databaseMap.toMutableMap()
+        var doesHaveAppendOp = false;
+      val completedOps =   ops.map{op->
+            val opType = op.first()
+            val opKey = op[1] as Int
+            val opValue = op[2]
+            when(opType){
              "r" -> {
-
-               val list =   sendMsg("lin-kv",readReq )
-                 listOf(txnType, txnKey, list)
-             }
+                 val value = databaseMapCopy.get(opKey) as List<Int>?
+                 listOf(opType, opKey, value)
+               }
                 "append" -> {
-                    val list  = sendMsg("lin-kv", readReq)
-                    val modifiedList = list.plus(txnValue as Int)
-                    val writeReq = EchoBody("cas", key = txnKey, from = list, to = modifiedList, createIfNotExists = true ,msgId = (0..10000).random() )
-                    val appendValue = sendMsg1("lin-kv", writeReq)
-                    listOf(txnType, txnKey, txnValue)
+                    doesHaveAppendOp = true
+                    val value = databaseMapCopy.get(opKey) as List<Int>?
+                    System.err.println("Append key:${opKey} value:${value}")
+                    val modifiedList = (value?:emptyList<Int>()).toMutableList().plus(opValue as Int)
+                    System.err.println("Append key:${opKey} value:${modifiedList}")
+                    databaseMapCopy.put(opKey, modifiedList)
+
+                    listOf(opType, opKey, opValue)
 
                 }
-                else ->  listOf(txnType, txnKey, txnValue)
+                else ->  listOf(opType, opKey, opValue)
 
             }
-            
         }
-        return completedTxns
+        if(doesHaveAppendOp){
+            val writeReq = EchoBody("cas", key = databaseKey, from = databaseMap, to = databaseMapCopy, createIfNotExists = true ,msgId = (0..10000).random() )
+            val appendValue = sendMsg1("lin-kv", writeReq)
+        }
+
+        return completedOps
     }
 }
