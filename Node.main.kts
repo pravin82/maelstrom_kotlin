@@ -30,10 +30,8 @@ class Node(
     private var readValue = emptyList<Int>()
     private var doesReadValueRec = false
     private var doesWriteValueRec = false
-//  override   fun run(){
-//       val currThread = Thread.currentThread()
-//       System.err.println("Running on thread ${currThread.name}")
-//   }
+    private val databaseKey = "ROOT"
+
 
     fun logMsg(msg:String) {
         logLock.tryLock(5,TimeUnit.SECONDS)
@@ -53,8 +51,8 @@ class Node(
 
             "txn" ->{
                thread{
-                  val txns = executeTxns(body.txn?:emptyList())
-                   val body = EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId,txn = txns)
+                  val ops = executeOps(body.txn?:emptyList())
+                   val body = EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId,txn = ops)
                    val msg = EchoMsg(echoMsg.id,echoMsg.src,body,echoMsg.dest)
                    val replyStr =   mapper.writeValueAsString(msg)
                    System.err.println("Sent Inside thread $replyStr")
@@ -166,7 +164,7 @@ class Node(
 
 
 
-    fun executeTxns(txns:List<List<Any?>>):List<List<Any?>>{
+    fun executeOps(txns:List<List<Any?>>):List<List<Any?>>{
       val completedTxns =   txns.map{txn->
             val txnType = txn.first()
             val txnKey = txn[1] as Int
