@@ -7,12 +7,14 @@
 @file:Import("Node.main.kts","dtos.main.kts")
 
 
-
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 
 val mapper = jacksonObjectMapper()
 val EMPTY_STRING = ""
 var nextMsgId = 12
+
+
+
 
 val nodeMap = mutableMapOf<String,Node>()
 while(true){
@@ -21,12 +23,18 @@ while(true){
       val body = echoMsg.body
       if(body.type == "init"){
           val newNode = Node(echoMsg.dest, echoMsg.body.nodeIds?: emptyList<String>(),0)
-          newNode.replicateMsgScheduler()
+//          val thread  =  Thread(newNode)
+//          thread.start()
+        //  newNode.replicateMsgScheduler()
           nodeMap.put(echoMsg.dest, newNode)
       }
+    val thread1 = Thread.currentThread()
    val node =  nodeMap.get(echoMsg.dest)
-    System.err.println("Received $input")
+    System.err.println("[ThreadName1:${thread1.name}]Received $input")
     node?.sendReplyMsg(echoMsg)
+
+
+
 
 }
 
