@@ -47,7 +47,6 @@ class Node(
             }
             "read","write","cas" -> {
             val raftBody =   raft.handleClientReq(body)
-                System.err.println("Body from raft ${raftBody}")
                 raftBody
 
             }

@@ -48,7 +48,9 @@ class StorageMap(){
 
 class Raft(){
     val stateMachine = StorageMap()
+    var candidateState = "follower"
     val lock = ReentrantLock()
+    val stateLock = ReentrantLock()
     fun handleClientReq(body:EchoBody):EchoBody{
         lock.tryLock(5,TimeUnit.SECONDS)
         val randMsgId = (0..10000).random()
@@ -57,4 +59,12 @@ class Raft(){
         val  replyBody =  EchoBody(opResult.type,msgId = randMsgId, inReplyTo = body.msgId, value = opResult.value )
         return replyBody
     }
+    fun becomeCandidate(){
+        stateLock.tryLock(5,TimeUnit.SECONDS)
+        candidateState = "candidate"
+        System.err.println("Became candidate")
+        stateLock.unlock()
+
+    }
+    
 }
