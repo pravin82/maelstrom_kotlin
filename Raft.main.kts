@@ -1,30 +1,18 @@
 #!/usr/bin/env kotlin
+@file:Repository("https://jcenter.bintray.com")
+@file:Import("dtos.main.kts")
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-data class Operation (
-    val type:String,
-    val msgId:Int,
-    val key:String,
-    val value:String?,
-    val from:String?,
-    val to:String?
-        )
 
-data class OpResult(
-    val type:String,
-    val value:String
-)
 
-data class Msg(
-    val body:Operation
-)
+
 
 class StorageMap(){
-    val storageMap = mutableMapOf<String,String>()
-    fun apply(op:Operation):OpResult{
-        val key = op.key
+    val storageMap = mutableMapOf<String,Int>()
+    fun apply(op:EchoBody):OpResult{
+        val key = op.key?:""
 
      val result =   when(op.type){
             "read" -> {
@@ -32,26 +20,26 @@ class StorageMap(){
                 if(value != null){
                     OpResult("read_ok", value)
                 }
-                else  OpResult("error","key not found")
+                else  OpResult("error",msg = "key not found")
             }
             "write" -> {
-                storageMap.put(key, op.value?:"")
-                OpResult("write_ok", op.value?:"")
+                storageMap.put(key, op.value?:-1)
+                OpResult("write_ok")
             }
             "cas" -> {
                 val value = storageMap.get(key)
                 if(value != null) {
-                    if(value != op.from) OpResult("error","expected ${op.from}, but had ${value}")
+                    if(value != op.from) OpResult("error",msg = "expected ${op.from}, but had ${value}",code = 22)
                     else {
-                        storageMap.put(key, op.to?:"")
-                        OpResult("cas_ok",op.to?:"")
+                        storageMap.put(key, op.to?:-1)
+                        OpResult("cas_ok")
                     }
 
                 }
-                else  OpResult("error","key not found")
+                else  OpResult("error",msg = "key not found", code = 20)
 
             }
-            else  -> {OpResult("error", "error msg")}
+            else  -> {OpResult("error",msg =  "error msg")}
         }
         return result
 
@@ -61,10 +49,12 @@ class StorageMap(){
 class Raft(){
     val stateMachine = StorageMap()
     val lock = ReentrantLock()
-    fun handleClientReq(msg:Msg){
+    fun handleClientReq(body:EchoBody):EchoBody{
         lock.tryLock(5,TimeUnit.SECONDS)
-       val resp =  stateMachine.apply(msg.body)
+        val randMsgId = (0..10000).random()
+       val opResult =  stateMachine.apply(body)
         lock.unlock()
-
+        val  replyBody =  EchoBody(opResult.type,msgId = randMsgId, inReplyTo = body.msgId, value = opResult.value )
+        return replyBody
     }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env kotlin
-// ./maelstrom test -w txn-list-append --bin /Users/pravin/script2/script2.main.kts  --time-limit 10 --log-stderr --node-count 1
+//./maelstrom test -w lin-kv --bin /Users/pravin/script2/script2.main.kts --time-limit 10 --rate 10 --node-count 1 --concurrency 2n --log-stderr
 
 @file:Repository("https://jcenter.bintray.com")
 @file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
@@ -20,7 +20,7 @@ while(true){
      val echoMsg = mapper.readValue(input, EchoMsg::class.java)
       val body = echoMsg.body
       if(body.type == "init"){
-          val newNode = Node(echoMsg.dest, echoMsg.body.nodeIds?: emptyList<String>(),0)
+          val newNode = Node(echoMsg.dest, 0)
 //          val thread  =  Thread(newNode)
 //          thread.start()
         //  newNode.replicateMsgScheduler()
@@ -32,6 +32,9 @@ while(true){
     node?.sendReplyMsg(echoMsg)
 
 }
+
+
+
 
 
 
