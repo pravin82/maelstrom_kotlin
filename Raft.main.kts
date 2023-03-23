@@ -17,6 +17,7 @@ class StorageMap(){
         val key = op.key?:""
 
      val result =   when(op.type){
+
             "read" -> {
              val value = storageMap.get(key)
                 if(value != null){
@@ -53,12 +54,23 @@ class Raft(val nodeIds:List<Int>){
     var candidateState = "follower"
     var electionDeadline = System.currentTimeMillis()
     val electionTimeout = 2000
+    private val condition = lock.newCondition()
     var term = 0
     val lock = ReentrantLock()
     val stateLock = ReentrantLock()
     val entriesLog = listOf(LogEntry(0)).toMutableList()
     val mapper = jacksonObjectMapper()
+    var doesReadValueRec = true
     fun handleClientReq(body:EchoBody):EchoBody{
+        when(body.type){
+            "request_vote_res" -> {
+                lock.tryLock(5,TimeUnit.SECONDS)
+                doesReadValueRec = true
+                conditon.signal()
+                lock.unlock()
+                
+            }
+        }
         lock.tryLock(5,TimeUnit.SECONDS)
         val randMsgId = (0..10000).random()
        val opResult =  stateMachine.apply(body)
@@ -87,15 +99,26 @@ class Raft(val nodeIds:List<Int>){
 
     fun sendVoteReq(){
         nodeIds.map{
-            lock.tryLock(5,TimeUnit.SECONDS)
             val msg = VoteReqMsg("request_vote", term, it,entriesLog.size,entriesLog.last().term )
             val msgStr = mapper.writeValueAsString(msg)
             System.err.println("Vote Req Sent: ${msgStr}")
-            System.out.println(msgStr)
-            lock.unlock()
+            sendSyncMsg(msgStr)
+
 
 
         }
+
+    }
+
+    fun sendSyncMsg(msg:String){
+        lock.tryLock(5,TimeUnit.SECONDS)
+        System.out.println( replyStr)
+        System.out.flush()
+        doesReadValueRec = false
+        while(!doesReadValueRec){
+            condition.await()
+        }
+        lock.unlock()
 
     }
 
