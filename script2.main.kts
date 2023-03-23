@@ -14,6 +14,7 @@ var nextMsgId = 12
 
 
 
+
 val nodeMap = mutableMapOf<String,Node>()
 while(true){
      val input = readLine()
@@ -21,7 +22,6 @@ while(true){
       val body = echoMsg.body
       if(body.type == "init"){
           val newNode = Node(echoMsg.dest, 0)
-          newNode.raft.candidateScheduler()
           nodeMap.put(echoMsg.dest, newNode)
       }
     val thread1 = Thread.currentThread()
@@ -30,6 +30,8 @@ while(true){
     node?.sendReplyMsg(echoMsg)
 
 }
+
+
 
 
 

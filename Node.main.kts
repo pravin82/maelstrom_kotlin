@@ -20,6 +20,7 @@ class Node(
     private val writeCondition = lock.newCondition()
     private val logLock = ReentrantLock()
     private val mapper = jacksonObjectMapper()
+    private var nodeIds:List<String> = emptyList()
     private val neighbors = mutableListOf<String?>()
     private val unackNeighborsMap = mutableMapOf<Int,MutableList<String?>>()
     private var readValue = emptyList<Int>()
@@ -27,7 +28,7 @@ class Node(
     private var doesWriteValueRec = false
     private val databaseKey = "ROOT"
     private var databaseValue = emptyMap<Int, List<Int>>()
-     val raft = Raft()
+     var raft = Raft(nodeId,emptyList())
 
 
     fun logMsg(msg:String) {
@@ -43,10 +44,14 @@ class Node(
         val replyType = body.type+"_ok"
         val replyBody =  when(body.type){
             "init" -> {
+                nodeIds = body.nodeIds?:emptyList()
+                raft = Raft(nodeId,nodeIds)
+                raft.candidateScheduler()
+
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
             "read","write","cas" -> {
-            val raftBody =   raft.handleClientReq(body)
+            val raftBody =   raft.handleClientReq(echoMsg)
                 raftBody
 
             }
