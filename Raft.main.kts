@@ -1,10 +1,17 @@
 #!/usr/bin/env kotlin
+
 @file:Repository("https://jcenter.bintray.com")
+@file:DependsOn("com.fasterxml.jackson.core:jackson-core:2.14.2")
+@file:DependsOn("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
 @file:Import("dtos.main.kts")
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import java.util.*
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import kotlin.concurrent.thread
+
+
 
 
 
@@ -54,10 +61,10 @@ class Raft(val nodeIds:List<Int>){
     var candidateState = "follower"
     var electionDeadline = System.currentTimeMillis()
     val electionTimeout = 2000
-    private val condition = lock.newCondition()
     var term = 0
     val lock = ReentrantLock()
     val stateLock = ReentrantLock()
+    private val condition = lock.newCondition()
     val entriesLog = listOf(LogEntry(0)).toMutableList()
     val mapper = jacksonObjectMapper()
     var doesReadValueRec = true
@@ -66,7 +73,7 @@ class Raft(val nodeIds:List<Int>){
             "request_vote_res" -> {
                 lock.tryLock(5,TimeUnit.SECONDS)
                 doesReadValueRec = true
-                conditon.signal()
+                condition.signal()
                 lock.unlock()
                 
             }
@@ -98,21 +105,21 @@ class Raft(val nodeIds:List<Int>){
     }
 
     fun sendVoteReq(){
-        nodeIds.map{
-            val msg = VoteReqMsg("request_vote", term, it,entriesLog.size,entriesLog.last().term )
-            val msgStr = mapper.writeValueAsString(msg)
-            System.err.println("Vote Req Sent: ${msgStr}")
-            sendSyncMsg(msgStr)
+        thread{
+            nodeIds.map{
+                val msg = VoteReqMsg("request_vote", term, it,entriesLog.size,entriesLog.last().term )
+                val msgStr = mapper.writeValueAsString(msg)
+                System.err.println("Vote Req Sent: ${msgStr}")
+                sendSyncMsg(msgStr)
 
-
-
+            }
         }
 
     }
 
     fun sendSyncMsg(msg:String){
         lock.tryLock(5,TimeUnit.SECONDS)
-        System.out.println( replyStr)
+        System.out.println( msg)
         System.out.flush()
         doesReadValueRec = false
         while(!doesReadValueRec){
