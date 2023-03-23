@@ -27,7 +27,7 @@ class Node(
     private var doesWriteValueRec = false
     private val databaseKey = "ROOT"
     private var databaseValue = emptyMap<Int, List<Int>>()
-    private val raft = Raft()
+     val raft = Raft()
 
 
     fun logMsg(msg:String) {

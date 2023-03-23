@@ -21,9 +21,7 @@ while(true){
       val body = echoMsg.body
       if(body.type == "init"){
           val newNode = Node(echoMsg.dest, 0)
-//          val thread  =  Thread(newNode)
-//          thread.start()
-        //  newNode.replicateMsgScheduler()
+          newNode.raft.candidateScheduler()
           nodeMap.put(echoMsg.dest, newNode)
       }
     val thread1 = Thread.currentThread()
@@ -32,6 +30,8 @@ while(true){
     node?.sendReplyMsg(echoMsg)
 
 }
+
+
 
 
 

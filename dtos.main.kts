@@ -37,6 +37,19 @@ data class EchoBody(
     val code:Int? = null
 )
 
+data class LogEntry(
+    val term:Int,
+    val body:EchoBody?=null
+)
+data class VoteReqMsg(
+    val type:String,
+    val term:Int,
+    @JsonProperty("candidate_id") val candidateId:Int,
+    @JsonProperty("last_log_index") val lastLogIndex:Int,
+    @JsonProperty("last_log_term") val lastLogTerm:Int
+
+)
+
 
 
 data class ReplyBody(
