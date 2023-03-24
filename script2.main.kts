@@ -13,8 +13,6 @@ val EMPTY_STRING = ""
 var nextMsgId = 12
 
 
-
-
 val nodeMap = mutableMapOf<String,Node>()
 while(true){
      val input = readLine()
@@ -30,6 +28,7 @@ while(true){
     node?.sendReplyMsg(echoMsg)
 
 }
+
 
 
 

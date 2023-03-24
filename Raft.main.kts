@@ -16,8 +16,6 @@ import kotlin.concurrent.thread
 
 
 
-
-
 class StorageMap(){
     val storageMap = mutableMapOf<String,Int>()
     fun apply(op:EchoBody):OpResult{
@@ -63,12 +61,14 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
     val electionTimeout = 2000
     var term = 0
     val lock = ReentrantLock()
+    val neighBorIds = nodeIds.minus(nodeId)
     var voteResp = EchoMsg(0,"", EchoBody(""),"")
     val stateLock = ReentrantLock()
     private val condition = lock.newCondition()
     val entriesLog = listOf(LogEntry(0)).toMutableList()
     val mapper = jacksonObjectMapper()
     var doesReadValueRec = true
+    var votedFor:String? = null
     val votes = mutableSetOf<String> (nodeId)
     fun handleClientReq(msg:EchoMsg):EchoBody{
         val body = msg.body
@@ -81,6 +81,9 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
                 lock.unlock()
                 
             }
+            "request_vote" -> {
+                respondToVoteRequest(body)
+            }
 
         }
         lock.tryLock(5,TimeUnit.SECONDS)
@@ -91,13 +94,51 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         return replyBody
     }
     fun becomeCandidate(){
-        stateLock.tryLock(5,TimeUnit.SECONDS)
+        lock.tryLock(5,TimeUnit.SECONDS)
         candidateState = "candidate"
         advanceTerm(term+1)
         resetElectionDeadline()
         System.err.println("Became candidate for term :${term}")
+        votedFor = nodeId
         sendVoteReq()
-        stateLock.unlock()
+        lock.unlock()
+
+    }
+
+
+    fun respondToVoteRequest(body:EchoBody){
+        var grantVote = false
+        maybeStepDown(body.term?:0)
+        if(body.term?:0 < term) {
+            System.err.println("Candidate term ${body.term} lower than ${term}, not granting vote.")
+        }
+        else if(votedFor != null){
+            System.err.println("Already voted for ${votedFor}, not granting vote")
+        }
+        else if(body.lastLogTerm?:0 < entriesLog.last().term){
+            System.err.println("Have log entries from term ${entriesLog.last().term} which is newer than remote term  ${body.lastLogTerm}, not granting vote")
+        }
+        else if(body.lastLogTerm == entriesLog.last().term && body.lastLogIndex?:0 < entriesLog.size){
+            System.err.println("Our logs are both at term ${body.lastLogTerm} but our log is ${entriesLog.size} and their is body.lastLogIndex long, not granting vote")
+        }
+        else {
+            System.err.println("Granting vote to ${body.candidateId}")
+            grantVote = true
+            votedFor = body.candidateId
+            resetElectionDeadline()
+        }
+        lock.tryLock(5,TimeUnit.SECONDS)
+        val replyBody = EchoBody("request_vote_res", term = term,voteGranted = grantVote )
+        val randMsgId = (0..10000).random()
+        val msg= EchoMsg(randMsgId,body.candidateId?:"", replyBody, nodeId )
+        val msgStr = mapper.writeValueAsString(msg)
+        System.err.println("Vote Request Resp sent : ${msgStr}")
+        System.out.println( msgStr)
+        System.out.flush()
+        lock.unlock()
+
+
+
 
     }
 
@@ -108,22 +149,29 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         System.err.println("Became follower for term :${term}")
         stateLock.unlock()
 
+
+        
     }
+
 
     fun sendVoteReq(){
         thread{
-            nodeIds.map{
+            neighBorIds.map{
+                val randMsgId = (0..10000).random()
                 val termForVoteRequested = term
-                val msg = VoteReqMsg("request_vote", termForVoteRequested, it,entriesLog.size,entriesLog.last().term )
+                val replyBody = EchoBody(type = "request_vote", term = termForVoteRequested, candidateId = nodeId,lastLogIndex = entriesLog.size,lastLogTerm = entriesLog.last().term )
+                val msg = EchoMsg(randMsgId, it, replyBody, nodeId)
                 val msgStr = mapper.writeValueAsString(msg)
-                System.err.println("Vote Req Sent: ${msgStr}")
+               // stateLock.tryLock(5,TimeUnit.SECONDS)
+                System.err.println("Vote Req Msg Sent: ${msgStr}")
+               // stateLock.unlock()
               val msgResp =   sendSyncMsg(msgStr)
                 val body = msgResp.body
                 val respTerm = body.term
                 val voteGranted = body.voteGranted?:false
                 maybeStepDown(respTerm?:0)
                 if(candidateState == "candidate" && term == respTerm && term == termForVoteRequested && voteGranted ){
-                    votes.plus(msgResp.src)
+                    votes.add(msgResp.src)
                     System.err.println("Have votes :${votes}")
                 }
 
@@ -158,6 +206,7 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
     }
 
     fun candidateScheduler(){
+        Thread.sleep((0..100).random().toLong())
         Timer().scheduleAtFixedRate( object : TimerTask() {
             override fun run() {
                 if(electionDeadline < System.currentTimeMillis())
@@ -168,7 +217,7 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
                 }
 
             }
-        }, 0, 2000)
+        }, 0, 100)
 
     }
 
@@ -184,6 +233,7 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         }
         else {
             term = newTerm
+            votedFor = null
         }
 
     }

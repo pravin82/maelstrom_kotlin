@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="942443cc-ca92-4e60-bd63-43697aa27d53" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Node.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/Node.main.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Raft.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/Raft.main.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dtos.main.kts" beforeDir="false" afterPath="$PROJECT_DIR$/dtos.main.kts" afterDir="false" />

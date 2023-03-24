@@ -14,7 +14,7 @@ class Node(
     val nodeId:String,
     val nextMsgId:Int
 ) {
-
+    
     private val lock = ReentrantLock()
     private val condition = lock.newCondition()
     private val writeCondition = lock.newCondition()
@@ -38,6 +38,7 @@ class Node(
         logLock.unlock()
     }
 
+
     fun sendReplyMsg(echoMsg: EchoMsg){
         val body = echoMsg.body
         val randMsgId = (0..10000).random()
@@ -46,16 +47,16 @@ class Node(
             "init" -> {
                 nodeIds = body.nodeIds?:emptyList()
                 raft = Raft(nodeId,nodeIds)
-                raft.candidateScheduler()
+               thread{
+                   raft.candidateScheduler()}
 
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
-            "read","write","cas" -> {
+            "read","write","cas", "request_vote", "request_vote_res" -> {
             val raftBody =   raft.handleClientReq(echoMsg)
                 raftBody
 
             }
-
 
 
 
@@ -69,7 +70,7 @@ class Node(
 
         val msg = EchoMsg(echoMsg.id,echoMsg.src,replyBody,echoMsg.dest)
         val replyStr =   mapper.writeValueAsString(msg)
-        if(body.type in listOf( "broadcast_ok", "replicate","read_ok","cas_ok","error", "txn")) return
+        if(body.type in listOf( "broadcast_ok", "replicate","read_ok","cas_ok","error","request_vote","request_vote_res", "txn","request_vote_ok", "request_vote_res_ok" )) return
         lock.tryLock(5,TimeUnit.SECONDS)
         System.err.println("Sent $replyStr")
         System.out.println( replyStr)
