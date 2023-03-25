@@ -31,6 +31,8 @@ class Node(
      var raft = Raft(nodeId,emptyList())
 
 
+
+
     fun logMsg(msg:String) {
         logLock.tryLock(5,TimeUnit.SECONDS)
         System.err.println(msg)
@@ -39,6 +41,7 @@ class Node(
     }
 
 
+    
     fun sendReplyMsg(echoMsg: EchoMsg){
         val body = echoMsg.body
         val randMsgId = (0..10000).random()
@@ -48,7 +51,9 @@ class Node(
                 nodeIds = body.nodeIds?:emptyList()
                 raft = Raft(nodeId,nodeIds)
                thread{
-                   raft.candidateScheduler()}
+                   raft.candidateScheduler()
+                   raft.stepDownScheduler()
+               }
 
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }

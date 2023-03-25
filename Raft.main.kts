@@ -15,7 +15,6 @@ import kotlin.concurrent.thread
 
 
 
-
 class StorageMap(){
     val storageMap = mutableMapOf<String,Int>()
     fun apply(op:EchoBody):OpResult{
@@ -59,6 +58,7 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
     var candidateState = "follower"
     var electionDeadline = System.currentTimeMillis()
     val electionTimeout = 2000
+    var stepDownDeadline = System.currentTimeMillis()
     var term = 0
     val lock = ReentrantLock()
     val neighBorIds = nodeIds.minus(nodeId)
@@ -98,10 +98,16 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         candidateState = "candidate"
         advanceTerm(term+1)
         resetElectionDeadline()
+        resetStepDownDeadline()
         System.err.println("Became candidate for term :${term}")
         votedFor = nodeId
         sendVoteReq()
         lock.unlock()
+
+    }
+    fun getMajorityNumber():Int{
+        val nodeSize = nodeIds.size
+       return (nodeSize.floorDiv(2)) + 1
 
     }
 
@@ -149,9 +155,21 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         System.err.println("Became follower for term :${term}")
         stateLock.unlock()
 
-
-        
     }
+
+    fun becomeLeader(){
+        stateLock.tryLock(5,TimeUnit.SECONDS)
+        if(candidateState != "candidate"){
+            System.err.println("Should be a candidate")
+            return
+        }
+        candidateState = "leader"
+        resetStepDownDeadline()
+        System.err.println("Became leader for term :${term}")
+        stateLock.unlock()
+
+    }
+
 
 
     fun sendVoteReq(){
@@ -173,11 +191,15 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
                 if(candidateState == "candidate" && term == respTerm && term == termForVoteRequested && voteGranted ){
                     votes.add(msgResp.src)
                     System.err.println("Have votes :${votes}")
+                    val majorityNo = getMajorityNumber()
+                    if(majorityNo <= votes.size) becomeLeader()
                 }
 
 
             }
         }
+        resetStepDownDeadline()
+
 
     }
 
@@ -201,6 +223,7 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
             advanceTerm(remoteTerm)
             becomeFollower()
         }
+        stateLock.unlock()
 
 
     }
@@ -220,11 +243,31 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         }, 0, 100)
 
     }
+    fun stepDownScheduler(){
+        Timer().scheduleAtFixedRate( object : TimerTask() {
+            override fun run() {
+                if(electionDeadline < System.currentTimeMillis() && candidateState == "leader"){
+                    System.err.println("Stepping down: haven't received any acks recently")
+                    becomeFollower()
+                }
+
+
+            }
+        }, 0, 100)
+
+    }
 
     fun resetElectionDeadline(){
         lock.tryLock(5,TimeUnit.SECONDS)
         electionDeadline = System.currentTimeMillis() +  (electionTimeout*(Math.random()+1)).toLong()
         lock.unlock()
+    }
+
+    fun resetStepDownDeadline(){
+        lock.tryLock(5,TimeUnit.SECONDS)
+        stepDownDeadline = System.currentTimeMillis() +  (electionTimeout*(Math.random()+1)).toLong()
+        lock.unlock()
+
     }
 
     fun advanceTerm(newTerm:Int){
