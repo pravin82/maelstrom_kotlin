@@ -70,6 +70,13 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
     var doesReadValueRec = true
     var votedFor:String? = null
     val votes = mutableSetOf<String> (nodeId)
+    var commitIndex = 0
+    val nextIndexMap = mutableMapOf<String,Int>()
+    val matchIndexMap = mutableMapOf<String,Int>()
+    val heartBeatInterval = 1000
+    val minRepInterval = 50
+    var lastReplication = System.currentTimeMillis()
+
     fun handleClientReq(msg:EchoMsg):EchoBody{
         val body = msg.body
         when(body.type){
@@ -88,11 +95,18 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         }
         lock.tryLock(5,TimeUnit.SECONDS)
         val randMsgId = (0..10000).random()
-       val opResult =  stateMachine.apply(body)
+        var opResult = OpResult("error", msg = "not a leader")
+        if(candidateState == "leader" && body.type in listOf("cas", "read", "write")){
+            entriesLog.add(LogEntry(body.term?:0, body))
+             opResult =  stateMachine.apply(body)
+            System.err.println("Log of leader :${entriesLog}")
+        }
         lock.unlock()
         val  replyBody =  EchoBody(opResult.type,msgId = randMsgId, inReplyTo = body.msgId, value = opResult.value )
         return replyBody
     }
+
+
     fun becomeCandidate(){
         lock.tryLock(5,TimeUnit.SECONDS)
         candidateState = "candidate"
@@ -109,6 +123,10 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         val nodeSize = nodeIds.size
        return (nodeSize.floorDiv(2)) + 1
 
+    }
+
+    fun matchIndex(){
+        matchIndexMap.put(nodeId,entriesLog.size )
     }
 
 
@@ -152,6 +170,8 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         stateLock.tryLock(5,TimeUnit.SECONDS)
         candidateState = "follower"
         resetElectionDeadline()
+        matchIndexMap.clear()
+        nextIndexMap.clear()
         System.err.println("Became follower for term :${term}")
         stateLock.unlock()
 
@@ -164,9 +184,35 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
             return
         }
         candidateState = "leader"
+        lastReplication = 0
+        nextIndexMap.clear()
+        matchIndexMap.clear()
+        neighBorIds.map{
+            nextIndexMap.put(it, entriesLog.size + 1)
+            matchIndexMap.put(it,0)
+        }
         resetStepDownDeadline()
         System.err.println("Became leader for term :${term}")
         stateLock.unlock()
+
+    }
+
+    fun replicateLog(){
+        stateLock.tryLock(5,TimeUnit.SECONDS)
+        val elapsedTime = System.currentTimeMillis() - lastReplication
+        var replicated = false
+        if(candidateState == "leader" && minRepInterval < elapsedTime){
+            neighBorIds.map{
+               val ni =  nextIndexMap.get(it)?:0
+                val entriesToReplicate = entriesLog.slice(ni..entriesLog.size)
+                if(entriesToReplicate.size > 0 || heartBeatInterval < elapsedTime){
+                    System.err.println("Replicating ${ni} to ${it}")
+                    replicated = true
+                }
+            }
+        }
+        stateLock.unlock()
+
 
     }
 

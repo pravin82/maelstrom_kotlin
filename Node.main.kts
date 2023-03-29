@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 
+
+
 class Node(
     val nodeId:String,
     val nextMsgId:Int
@@ -62,7 +64,6 @@ class Node(
                 raftBody
 
             }
-
 
 
             else -> {

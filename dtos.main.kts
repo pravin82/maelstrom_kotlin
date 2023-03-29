@@ -44,7 +44,7 @@ data class EchoBody(
 
 data class LogEntry(
     val term:Int,
-    val body:EchoBody?=null
+    val op:EchoBody?=null
 )
 data class VoteReqMsg(
     val type:String,
