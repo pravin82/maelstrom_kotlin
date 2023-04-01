@@ -38,8 +38,11 @@ data class EchoBody(
     val term:Int? = null,
     @JsonProperty("vote_granted") val voteGranted:Boolean? = null,
     @JsonProperty("candidate_id") val candidateId:String? = null,
+    @JsonProperty("leader_id") val leaderId:String? = null,
     @JsonProperty("last_log_index") val lastLogIndex:Int? = null,
-    @JsonProperty("last_log_term") val lastLogTerm:Int? = null
+    @JsonProperty("prev_log_index") val prevLogIndex:Int? = null,
+    @JsonProperty("last_log_term") val lastLogTerm:Int? = null,
+    val success:Boolean? = null,
 )
 
 data class LogEntry(

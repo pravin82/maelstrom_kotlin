@@ -59,7 +59,7 @@ class Node(
 
                 EchoBody(replyType,msgId = randMsgId, inReplyTo = body.msgId )
             }
-            "read","write","cas", "request_vote", "request_vote_res" -> {
+            "read","write","cas", "request_vote", "request_vote_res", "append_entries" -> {
             val raftBody =   raft.handleClientReq(echoMsg)
                 raftBody
 
@@ -76,7 +76,8 @@ class Node(
 
         val msg = EchoMsg(echoMsg.id,echoMsg.src,replyBody,echoMsg.dest)
         val replyStr =   mapper.writeValueAsString(msg)
-        if(body.type in listOf( "broadcast_ok", "replicate","read_ok","cas_ok","error","request_vote","request_vote_res", "txn","request_vote_ok", "request_vote_res_ok" )) return
+        if(body.type in listOf( "broadcast_ok", "replicate","read_ok","cas_ok","error","request_vote","request_vote_res", "txn","request_vote_ok",
+                "request_vote_res_ok","append_entries" )) return
         lock.tryLock(5,TimeUnit.SECONDS)
         System.err.println("Sent $replyStr")
         System.out.println( replyStr)

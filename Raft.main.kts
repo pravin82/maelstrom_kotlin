@@ -19,7 +19,8 @@ class StorageMap(){
     val storageMap = mutableMapOf<String,Int>()
     fun apply(op:EchoBody):OpResult{
         val key = op.key?:""
-
+        val x = y
+        
      val result =   when(op.type){
 
             "read" -> {
@@ -91,6 +92,9 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
             "request_vote" -> {
                 respondToVoteRequest(body)
             }
+            "append_entries" -> {
+                handleAppendEntriesReq(body)
+            }
 
         }
         lock.tryLock(5,TimeUnit.SECONDS)
@@ -122,6 +126,35 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
     fun getMajorityNumber():Int{
         val nodeSize = nodeIds.size
        return (nodeSize.floorDiv(2)) + 1
+
+    }
+
+    fun handleAppendEntriesReq(body:EchoBody){
+        lock.tryLock(5,TimeUnit.SECONDS)
+        maybeStepDown(body.term?:0)
+        var replyBody = EchoBody(type = "append_entries_res", term = term, success = false)
+        if(body.term >= term) {
+            resetElectionDeadline()
+            val prevLogIndex = body.prevLogIndex
+            if(prevLogIndex <= 0) {
+                replyBody = EchoBody(type = "error")
+                System.err.println("Out of bounds previous log index ${prevLogIndex}")
+            }
+            val entry = entriesLog.get(prevLogIndex)
+            if(entry != null || entry.term == body.prevLogTerm) {
+                entriesLog.subList(prevLogIndex, entriesLog.size).clear()
+                entriesLog.addAll(body.entries)
+                commitIndex = minOf(entriesLog.size, body.leaderCommit)
+                replyBody = EchoBody(type = "append_entries_res", term = term, success = true)
+            }
+        }
+        val randMsgId = (0..10000).random()
+        val msg= EchoMsg(randMsgId,body.candidateId?:"", replyBody, nodeId )
+        val msgStr = mapper.writeValueAsString(msg)
+        System.err.println("Append Entries Resp sent : ${msgStr}")
+        System.out.println( msgStr)
+        System.out.flush()
+        lock.unlock()
 
     }
 
@@ -204,10 +237,12 @@ class Raft(val nodeId:String,val nodeIds:List<String>){
         if(candidateState == "leader" && minRepInterval < elapsedTime){
             neighBorIds.map{
                val ni =  nextIndexMap.get(it)?:0
-                val entriesToReplicate = entriesLog.slice(ni..entriesLog.size)
+                val prevLogTerm = entriesLog[ni-2].term
+                val entriesToReplicate = entriesLog.slice(ni-1..entriesLog.size)
                 if(entriesToReplicate.size > 0 || heartBeatInterval < elapsedTime){
                     System.err.println("Replicating ${ni} to ${it}")
                     replicated = true
+                    val body = EchoBody("append_entries", term = term,leaderId = nodeId,prevLogIndex = ni-1, prevLogTerm = prevLogTerm )
                 }
             }
         }
